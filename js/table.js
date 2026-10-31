@@ -34,6 +34,20 @@ function table() {
     // two different calls to enter() and data(), or with two different loops.
 
     // YOUR CODE HERE
+    let rows = table.append('tbody')
+      .selectAll('tr')
+      .data(data)
+      .enter()
+      .append('tr');
+
+    // One cell per column, in the same order as the headers
+    rows.selectAll('td')
+      .data(d => tableHeaders.map(key => d[key]))
+      .enter()
+      .append('td')
+        .text(d => d);
+
+    selectableElements = rows;
 
 
     // Then, add code to allow for brushing.  Note, this is handled differently
@@ -48,6 +62,47 @@ function table() {
     // and when the mouse is down, keep track of any rows that have been mouseover'd
 
     // YOUR CODE HERE
+    let isBrushing = false, // true while the mouse button is held down
+      startIndex = -1;      // index of the row where the brush started
+
+    // Don't select the cell text while dragging across rows
+    table.classed("text-unselectable", true);
+
+    rows
+      // Start a new brush on the pressed row
+      .on("mousedown", (event, d) => {
+        isBrushing = true;
+        startIndex = data.indexOf(d);
+        brushTo(startIndex);
+      })
+      // Hover highlight, and extend the brush while dragging
+      .on("mouseover", (event, d) => {
+        d3.select(event.currentTarget).classed("mouseover", true);
+        if (isBrushing) brushTo(data.indexOf(d));
+      })
+      .on("mouseout", (event) => {
+        d3.select(event.currentTarget).classed("mouseover", false);
+      });
+
+    // End the brush wherever the mouse is released, even outside the table
+    d3.select(window).on("mouseup.table", () => {
+      isBrushing = false;
+    });
+
+    // Select every row between the start row and the given row (inclusive),
+    // then let the other charts know about our selection
+    function brushTo(endIndex) {
+      const lo = Math.min(startIndex, endIndex),
+        hi = Math.max(startIndex, endIndex);
+
+      rows.classed("selected", (d, i) => lo <= i && i <= hi);
+
+      // Get the name of our dispatcher's event
+      let dispatchString = Object.getOwnPropertyNames(dispatcher._)[0];
+
+      // Let other charts know about our selection
+      dispatcher.call(dispatchString, this, table.selectAll("tr.selected").data());
+    }
 
     return chart;
   }
@@ -65,7 +120,7 @@ function table() {
     if (!arguments.length) return;
 
     // Select an element if its datum was selected
-    d3.selectAll('tr').classed("selected", d => {
+    selectableElements.classed("selected", d => {
       return selectedData.includes(d)
     });
   };
